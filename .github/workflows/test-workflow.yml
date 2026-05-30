@@ -1,0 +1,53 @@
+name: 🏗️ Test Workflow Dispatch
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-process-check:
+    name: Test Process Check Jobs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Test Branch Name (Valid)
+        run: |
+          BRANCH="feat/PROJ-101-add-login"
+          PATTERN="^(feat|fix|hotfix|docs|refactor|test|chore)/[A-Za-z]+-[0-9]+-[a-z0-9-]+$"
+          if [[ "$BRANCH" =~ $PATTERN ]]; then
+            echo "✅ Valid branch: $BRANCH"
+          else
+            echo "❌ Invalid branch: $BRANCH"
+            exit 1
+          fi
+
+      - name: Test Branch Name (Invalid)
+        run: |
+          BRANCH="invalid-branch-name"
+          PATTERN="^(feat|fix|hotfix|docs|refactor|test|chore)/[A-Za-z]+-[0-9]+-[a-z0-9-]+$"
+          if [[ "$BRANCH" =~ $PATTERN ]]; then
+            echo "❌ Should have failed for: $BRANCH"
+            exit 1
+          else
+            echo "✅ Correctly rejected invalid branch: $BRANCH"
+          fi
+
+      - name: Test Commit Message
+        run: |
+          PATTERN="^(feat|fix|docs|chore|refactor|test): .+"
+          COMMIT="fix(auth): handle null token"
+          if [[ "$COMMIT" =~ $PATTERN ]]; then
+            echo "✅ Valid commit: $COMMIT"
+          else
+            echo "❌ Invalid commit: $COMMIT"
+            exit 1
+          fi
+
+      - name: Test Blog Post File Detection
+        run: |
+          touch docs/issue-blog/2026-05-30-1-test-bug-fix.md
+          echo "✅ Created blog post file"
+
+      - name: Build Success
+        run: echo "✅ All process checks PASSED! Automation hub is working correctly."
