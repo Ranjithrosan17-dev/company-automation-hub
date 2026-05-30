@@ -1,0 +1,83 @@
+name: 🔍 Process Enforcement Check
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches-ignore: [main, develop]
+
+jobs:
+  branch-name-check:
+    name: ✅ Branch Naming Convention
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check branch name
+        run: |
+          BRANCH="${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}"
+          echo "Branch: $BRANCH"
+
+          # Allow protected branches
+          if [[ "$BRANCH" =~ ^(main|master|develop|release/.*)$ ]]; then
+            echo "✅ Protected branch - skip."
+            exit 0
+          fi
+
+          PATTERN="^(feat|fix|hotfix|docs|refactor|test|chore)/[A-Za-z]+-[0-9]+-[a-z0-9-]+$"
+          if [[ "$BRANCH" =~ $PATTERN ]]; then
+            echo "✅ Branch name valid: $BRANCH"
+          else
+            echo "❌ Invalid branch name: $BRANCH"
+            echo "Format: <type>/<TICKET-ID>-<description>"
+            echo "Example: feat/PROJ-101-add-login"
+            exit 1
+          fi
+
+  pr-description-check:
+    name: ✅ PR Description Completeness
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Check PR body
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          if [ -z "$PR_BODY" ] || [ ${#PR_BODY} -lt 50 ]; then
+            echo "❌ PR description is too short or empty."
+            echo "Please fill in the PR template completely."
+            exit 1
+          fi
+          echo "✅ PR description looks good."
+
+  blog-post-check:
+    name: ✅ Issue Blog Post Check
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for blog post on bug fixes
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+        run: |
+          # If PR has 'bug' or 'recurring' label, check for blog post
+          if echo "$PR_LABELS" | grep -qE '(bug|recurring)'; then
+            BLOG_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep 'docs/issue-blog/' | grep -v 'README.md' | grep -v 'TEMPLATE.md' || true)
+            if [ -z "$BLOG_FILES" ]; then
+              echo "⚠️ WARNING: This PR fixes a bug/recurring issue but no blog post was found in docs/issue-blog/"
+              echo "Please add a blog post documenting the root cause and resolution."
+              echo "Use the template: docs/issue-blog/TEMPLATE.md"
+              # Set as warning only (exit 0) - change to exit 1 to enforce strictly
+              exit 0
+            else
+              echo "✅ Blog post found: $BLOG_FILES"
+            fi
+          else
+            echo "ℹ️ No bug/recurring label - blog post not required."
+          fi

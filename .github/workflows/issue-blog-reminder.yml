@@ -1,0 +1,47 @@
+name: 📖 Issue Blog Reminder
+
+on:
+  issues:
+    types: [closed]
+
+jobs:
+  blog-reminder:
+    name: Remind about blog post
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check labels and post reminder
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue;
+            const labels = issue.labels.map(l => l.name);
+
+            const requiresBlog = labels.includes('bug') || labels.includes('recurring');
+
+            if (requiresBlog) {
+              const comment = `## 📖 Issue Blog Post Reminder
+
+            This issue was labeled **\`${ labels.includes('recurring') ? 'recurring' : 'bug' }\`** and has been closed.
+
+            📌 **Action Required:** Please document this issue in the Issue Resolution Blog.
+
+            ### Steps:
+            1. Copy \`docs/issue-blog/TEMPLATE.md\`
+            2. Create file: \`docs/issue-blog/${new Date().toISOString().split('T')[0]}-${issue.number}-<short-title>.md\`
+            3. Fill in: Root Cause, Fix Applied, and Prevention Measures
+            4. Open a PR with your blog post
+            5. Run: \`python scripts/generate-blog-index.py\`
+
+            > This is automated. Refer to [PROCESS.md](../blob/main/PROCESS.md) for full guidelines.`;
+
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body: comment
+              });
+
+              console.log(`✅ Blog reminder posted on issue #${issue.number}`);
+            } else {
+              console.log(`ℹ️ Issue #${issue.number} does not require a blog post.`);
+            }
